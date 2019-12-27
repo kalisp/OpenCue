@@ -54,6 +54,15 @@ SHELL_LAYER_DATA = {
     'dependType': cuesubmit.Layer.DependType.Frame,
 }
 
+BLENDER_LAYER_DATA = {
+    'name': 'arbitraryBlenderLayer_name',
+    'layerType': cuesubmit.JobTypes.JobTypes.BLENDER,
+    'cmd': {'blenderFile': '/path/to/script.blend', 'outputPath': '/path/to/output/', 'outputFormat': 'PNG'},
+    'layerRange': '10-20',
+    'cores': '1',
+    'services': ['blender'],
+}
+
 
 @mock.patch('outline.cuerun.launch')
 class SubmissionTests(unittest.TestCase):
@@ -143,6 +152,30 @@ class SubmissionTests(unittest.TestCase):
         self.assertEqual(shellLayer, depend.get_dependant_layer())
         self.assertEqual(outline.depend.DependType.FrameByFrame, depend.get_type())
 
+    def testSubmitBlenderJob(self, launchMock):
+        cuesubmit.Submission.submitJob({
+            'name': 'arbitrary-blender-job',
+            'shot': 'arbitrary-shot-name',
+            'show': 'arbitrary-show-name',
+            'username': 'arbitrary-user',
+            'layers': [cuesubmit.Layer.LayerData.buildFactory(**BLENDER_LAYER_DATA)],
+        })
+
+        outline = launchMock.call_args[0][0]
+        self.assertEqual(1, len(outline.get_layers()))
+        layer = outline.get_layer(BLENDER_LAYER_DATA['name'])
+        self.assertEqual(BLENDER_LAYER_DATA['name'], layer.get_name())
+        self.assertEqual(
+            [
+                'blender', '-b', '-noaudio', BLENDER_LAYER_DATA['cmd']['blenderFile'],
+                '-o', BLENDER_LAYER_DATA['cmd']['outputPath'], '-F', BLENDER_LAYER_DATA['cmd']['outputFormat'],
+                '-f', '#IFRAME#'
+            ],
+
+            layer.get_arg('command')
+        )
+        self.assertEqual(BLENDER_LAYER_DATA['layerRange'], layer.get_frame_range())
+        self.assertEqual('blender', layer.get_service())
 
 if __name__ == '__main__':
     unittest.main()
